@@ -1,0 +1,19 @@
+# Ignore environment files
+.env
+
+# Ignore configuration files
+config.json
+
+# Ignore compiled binaries
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Ignore Go build output
+bin/
+*.out
+*.log
+
+# Ignore macOS system files
+.DS_Store

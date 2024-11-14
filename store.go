@@ -11,6 +11,8 @@ type Store interface {
 	ListExpenses() ([]Expense, error)
 
 	SetUserWeeklyLimit(userID int, newLimit int) error
+
+    GetUserByEmail(email string) (User, error)
 }
 
 type PostgresStore struct {
@@ -87,4 +89,14 @@ func (p *PostgresStore) SetUserWeeklyLimit(userID int, newLimit int) error {
     }
 
     return nil
+}
+
+func (p *PostgresStore) GetUserByEmail(email string) (User, error) {
+    var user User
+    query := `SELECT id, name, email, password_hash, weekly_spending_limit FROM users WHERE email = $1`
+    err := p.conn.QueryRow(context.Background(), query, email).Scan(&user.Id, &user.Name, &user.Email, &user.PasswordHash, &user.WeeklySpendingLimit)
+    if err != nil {
+        return User{}, fmt.Errorf("user not found: %v", err)
+    }
+    return user, nil
 }

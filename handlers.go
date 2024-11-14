@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+    "golang.org/x/crypto/bcrypt"
 )
 
 // Handler struct to encapsulate HTTP handling logic
@@ -26,6 +27,7 @@ func RegisterRouters(mux *chi.Mux, handler *Handler)  {
     mux.Post("/expenses", handler.CreateExpense)
     mux.Get("/expenses", handler.ListExpenses)
     mux.Put("/users/{userID}/limit", handler.SetUserWeeklyLimit)
+    mux.Post("/auth/login", handler.AuthenticateUser)
 
 }
 
@@ -84,4 +86,32 @@ func (h *Handler) SetUserWeeklyLimit(w http.ResponseWriter, r *http.Request) {
     }
 
     w.WriteHeader(http.StatusNoContent) // Respond with 204 No Content if successful
+}
+
+// AuthenticateUser handler to validate email and password, then return user ID
+func (h *Handler) AuthenticateUser(w http.ResponseWriter, r *http.Request) {
+    var credentials struct {
+        Email    string `json:"email"`
+        Password string `json:"password"`
+    }
+
+    if err := json.NewDecoder(r.Body).Decode(&credentials); err != nil {
+        http.Error(w, "Invalid request payload", http.StatusBadRequest)
+        return
+    }
+
+    user, err := h.store.GetUserByEmail(credentials.Email)
+    if err != nil {
+        http.Error(w, "User not found", http.StatusNotFound)
+        return
+    }
+
+    if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(credentials.Password)); err != nil {
+        http.Error(w, "Invalid email or password", http.StatusUnauthorized)
+        return
+    }
+
+    // Return user ID if authentication is successful
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(map[string]int{"user_id": user.Id})
 }

@@ -36,6 +36,7 @@ func main() {
     }
 
     // connect to database
+    // connStr := fmt.Sprintf("postgresql://postgres:%s@host.docker.internal:5432/Expense_Tracker", config.PostgresPassword)
     connStr := fmt.Sprintf("postgresql://postgres:%s@localhost:5432/Expense_Tracker", config.PostgresPassword)
 
 	store, err := NewPostgresStore(connStr)

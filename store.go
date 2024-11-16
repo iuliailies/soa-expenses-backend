@@ -3,12 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
+
 	"github.com/jackc/pgx/v5"
 )
 
 type Store interface {
 	CreateExpense(e Expense) (Expense, error)
-	ListExpenses() ([]Expense, error)
+	ListExpenses(userID int) ([]Expense, error)
 
 	SetUserWeeklyLimit(userID int, newLimit int) error
 
@@ -43,19 +44,20 @@ func (p *PostgresStore) CreateExpense(e Expense) (Expense, error) {
     return e, nil
 }
 
-func (p *PostgresStore) ListExpenses() ([]Expense, error) {
+func (p *PostgresStore) ListExpenses(userID int) ([]Expense, error) {
     query := `
         SELECT id, user_id, amount, date, category
-        FROM expenses;
+        FROM expenses
+        WHERE user_id = $1;
     `
 
-    rows, err := p.conn.Query(context.Background(), query)
+    rows, err := p.conn.Query(context.Background(), query, userID)
     if err != nil {
-        return nil, fmt.Errorf("failed to list expenses: %v", err)
+        return nil, fmt.Errorf("failed to list expenses for user %d: %v", userID, err)
     }
     defer rows.Close()
 
-    var expenses []Expense
+    expenses := []Expense{}
     for rows.Next() {
         var e Expense
         err := rows.Scan(&e.Id, &e.UserId, &e.Amount, &e.Date, &e.Category)
@@ -71,6 +73,7 @@ func (p *PostgresStore) ListExpenses() ([]Expense, error) {
 
     return expenses, nil
 }
+
 
 func (p *PostgresStore) SetUserWeeklyLimit(userID int, newLimit int) error {
     query := `

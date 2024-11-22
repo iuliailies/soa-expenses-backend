@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -23,6 +24,15 @@ func NewHandler(store Store) *Handler {
 func RegisterRouters(mux *chi.Mux, handler *Handler) {
     mux.Use(middleware.Logger) // Add logging middleware
 
+    mux.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   []string{"*"}, 
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Content-Type", "Authorization"},
+		ExposedHeaders:   []string{"Content-Length"},
+		AllowCredentials: true, 
+		MaxAge:           300,  
+	}))
+
     mux.Route("/api", func(api chi.Router) {
         api.Post("/expenses", handler.CreateExpense)
         api.Get("/expenses", handler.ListExpenses)
@@ -34,18 +44,37 @@ func RegisterRouters(mux *chi.Mux, handler *Handler) {
 
 // Handler function to create a new expense
 func (h *Handler) CreateExpense(w http.ResponseWriter, r *http.Request) {
+    // Extract user ID from the request header
+    userIDStr := r.Header.Get("X-User-ID")
+    if userIDStr == "" {
+        http.Error(w, "Unauthorized: missing or invalid user_id", http.StatusUnauthorized)
+        return
+    }
+
+    userID, err := strconv.Atoi(userIDStr)
+    if err != nil {
+        http.Error(w, "Invalid user_id format", http.StatusBadRequest)
+        return
+    }
+
+    // Decode the expense from the request body
     var expense Expense
     if err := json.NewDecoder(r.Body).Decode(&expense); err != nil {
         http.Error(w, "Invalid request payload", http.StatusBadRequest)
         return
     }
 
+    // Assign the extracted user ID to the expense
+    expense.UserId = userID
+
+    // Create the expense in the database
     createdExpense, err := h.store.CreateExpense(expense)
     if err != nil {
         http.Error(w, fmt.Sprintf("Failed to create expense: %v", err), http.StatusInternalServerError)
         return
     }
 
+    // Respond with the created expense
     w.Header().Set("Content-Type", "application/json")
     json.NewEncoder(w).Encode(createdExpense)
 }

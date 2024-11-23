@@ -36,7 +36,7 @@ func RegisterRouters(mux *chi.Mux, handler *Handler) {
     mux.Route("/api", func(api chi.Router) {
         api.Post("/expenses", handler.CreateExpense)
         api.Get("/expenses", handler.ListExpenses)
-        api.Put("/users/{userID}/limit", handler.SetUserWeeklyLimit)
+        api.Put("/users/limit", handler.SetUserWeeklyLimit)
     })
 
     mux.Post("/auth/login", handler.AuthenticateUser)
@@ -106,10 +106,15 @@ func (h *Handler) ListExpenses(w http.ResponseWriter, r *http.Request) {
 
 // Handler function to update a user's weekly spending limit
 func (h *Handler) SetUserWeeklyLimit(w http.ResponseWriter, r *http.Request) {
-    userIDStr := chi.URLParam(r, "userID")
+    userIDStr := r.Header.Get("X-User-ID")
+    if userIDStr == "" {
+        http.Error(w, "Unauthorized: missing or invalid user_id", http.StatusUnauthorized)
+        return
+    }
+
     userID, err := strconv.Atoi(userIDStr)
     if err != nil {
-        http.Error(w, "Invalid user ID", http.StatusBadRequest)
+        http.Error(w, "Invalid user_id format", http.StatusBadRequest)
         return
     }
 

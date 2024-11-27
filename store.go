@@ -10,8 +10,10 @@ import (
 type Store interface {
 	CreateExpense(e Expense) (Expense, error)
 	ListExpenses(userID int) ([]Expense, error)
+    DeleteExpense(expenseID int) error
 
 	SetUserWeeklyLimit(userID int, newLimit int) error
+    GetUserWeeklyLimit(userID int) (int, error)
 
     GetUserByEmail(email string) (User, error)
 }
@@ -94,6 +96,25 @@ func (p *PostgresStore) SetUserWeeklyLimit(userID int, newLimit int) error {
     return nil
 }
 
+func (p *PostgresStore) GetUserWeeklyLimit(userID int) (int, error) {
+    var weeklyLimit int
+    query := `
+        SELECT weekly_spending_limit
+        FROM users
+        WHERE id = $1;
+    `
+
+    err := p.conn.QueryRow(context.Background(), query, userID).Scan(&weeklyLimit)
+    if err != nil {
+        if err == pgx.ErrNoRows {
+            return 0, fmt.Errorf("user with ID %d not found", userID)
+        }
+        return 0, fmt.Errorf("failed to retrieve weekly limit: %v", err)
+    }
+
+    return weeklyLimit, nil
+}
+
 func (p *PostgresStore) GetUserByEmail(email string) (User, error) {
     var user User
     query := `SELECT id, name, email, password_hash, weekly_spending_limit FROM users WHERE email = $1`
@@ -102,4 +123,22 @@ func (p *PostgresStore) GetUserByEmail(email string) (User, error) {
         return User{}, fmt.Errorf("user not found: %v", err)
     }
     return user, nil
+}
+
+func (p *PostgresStore) DeleteExpense(expenseID int) error {
+	query := `
+        DELETE FROM expenses
+        WHERE id = $1;
+    `
+
+	result, err := p.conn.Exec(context.Background(), query, expenseID)
+	if err != nil {
+		return fmt.Errorf("failed to delete expense: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("no expense found with ID %d", expenseID)
+	}
+
+	return nil
 }

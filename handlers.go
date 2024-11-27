@@ -8,7 +8,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/go-chi/cors"
+
+	// "github.com/go-chi/cors"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -24,19 +25,12 @@ func NewHandler(store Store) *Handler {
 func RegisterRouters(mux *chi.Mux, handler *Handler) {
     mux.Use(middleware.Logger) // Add logging middleware
 
-    mux.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"*"}, 
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Content-Type", "Authorization"},
-		ExposedHeaders:   []string{"Content-Length"},
-		AllowCredentials: true, 
-		MaxAge:           300,  
-	}))
-
     mux.Route("/api", func(api chi.Router) {
         api.Post("/expenses", handler.CreateExpense)
         api.Get("/expenses", handler.ListExpenses)
+        api.Delete("/expenses/{id}", handler.DeleteExpense)
         api.Put("/users/limit", handler.SetUserWeeklyLimit)
+        api.Get("/users/limit", handler.GetUserWeeklyLimit)
     })
 
     mux.Post("/auth/login", handler.AuthenticateUser)
@@ -104,6 +98,23 @@ func (h *Handler) ListExpenses(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(expenses)
 }
 
+func (h *Handler) DeleteExpense(w http.ResponseWriter, r *http.Request) {
+	expenseIDStr := chi.URLParam(r, "id")
+	expenseID, err := strconv.Atoi(expenseIDStr)
+	if err != nil || expenseID <= 0 {
+		http.Error(w, "Invalid expense ID", http.StatusBadRequest)
+		return
+	}
+
+	err = h.store.DeleteExpense(expenseID)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to delete expense: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent) // 204 No Content
+}
+
 // Handler function to update a user's weekly spending limit
 func (h *Handler) SetUserWeeklyLimit(w http.ResponseWriter, r *http.Request) {
     userIDStr := r.Header.Get("X-User-ID")
@@ -133,6 +144,31 @@ func (h *Handler) SetUserWeeklyLimit(w http.ResponseWriter, r *http.Request) {
     }
 
     w.WriteHeader(http.StatusNoContent) // Respond with 204 No Content if successful
+}
+
+func (h *Handler) GetUserWeeklyLimit(w http.ResponseWriter, r *http.Request) {
+    userIDStr := r.Header.Get("X-User-ID")
+    if userIDStr == "" {
+        http.Error(w, "Unauthorized: missing or invalid user ID", http.StatusUnauthorized)
+        return
+    }
+
+    userID, err := strconv.Atoi(userIDStr)
+    if err != nil {
+        http.Error(w, "Invalid user ID format", http.StatusBadRequest)
+        return
+    }
+
+    // Retrieve the weekly limit from the store
+    weeklyLimit, err := h.store.GetUserWeeklyLimit(userID)
+    if err != nil {
+        http.Error(w, fmt.Sprintf("Failed to retrieve weekly limit: %v", err), http.StatusInternalServerError)
+        return
+    }
+
+    // Respond with the weekly limit
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(map[string]int{"weekly_limit": weeklyLimit})
 }
 
 // AuthenticateUser handler to validate email and password, then return user ID

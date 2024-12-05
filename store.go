@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Store interface {
@@ -19,11 +21,12 @@ type Store interface {
 }
 
 type PostgresStore struct {
-	conn *pgx.Conn
+	conn *pgxpool.Pool
 }
 
 func NewPostgresStore(connStr string) (*PostgresStore, error) {
-    conn, err := pgx.Connect(context.Background(), connStr)
+    fmt.Println(sql.Drivers())
+    conn, err := pgxpool.New(context.Background(), connStr)
     if err != nil {
         return nil, fmt.Errorf("unable to connect to database: %v", err)
     }

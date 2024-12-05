@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -36,14 +35,14 @@ func main() {
     }
 
     // connect to database
-    // connStr := fmt.Sprintf("postgresql://postgres:%s@host.docker.internal:5432/Expense_Tracker", config.PostgresPassword)
-    connStr := fmt.Sprintf("postgresql://postgres:%s@localhost:5432/Expense_Tracker", config.PostgresPassword)
+    connStr := fmt.Sprintf("postgresql://postgres:%s@host.docker.internal:5432/Expense_Tracker", config.PostgresPassword)
+    // connStr := fmt.Sprintf("postgresql://postgres:%s@localhost:5432/Expense_Tracker", config.PostgresPassword)
 
 	store, err := NewPostgresStore(connStr)
     if err != nil {
         log.Fatalf("Unable to initialize store: %v\n", err)
     }
-    defer store.conn.Close(context.Background())
+    defer store.conn.Close()
 
     fmt.Println("Successfully connected to the database!")
 

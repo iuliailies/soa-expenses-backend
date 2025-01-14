@@ -17,9 +17,13 @@ type Store interface {
 	SetUserWeeklyLimit(userID int, newLimit int) error
     GetUserWeeklyLimit(userID int) (int, error)
 
+    GetWeeklyExpenses(userID int) (int, error) 
+
     GetUserByEmail(email string) (User, error)
 }
 
+// a pgx pool allows the app to reuse and efficiently manage a set of connections to the database, 
+// rather than opening and closing a new connection for every query.
 type PostgresStore struct {
 	conn *pgxpool.Pool
 }
@@ -144,4 +148,22 @@ func (p *PostgresStore) DeleteExpense(expenseID int) error {
 	}
 
 	return nil
+}
+
+func (p *PostgresStore) GetWeeklyExpenses(userID int) (int, error) {
+	query := `
+        SELECT COALESCE(SUM(amount), 0)
+        FROM expenses
+        WHERE user_id = $1
+          AND date >= date_trunc('week', CURRENT_DATE)
+          AND date < date_trunc('week', CURRENT_DATE) + interval '1 week';
+    `
+
+	var totalExpenses int
+	err := p.conn.QueryRow(context.Background(), query, userID).Scan(&totalExpenses)
+	if err != nil {
+		return 0, fmt.Errorf("failed to calculate weekly expenses: %v", err)
+	}
+
+	return totalExpenses, nil
 }

@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -46,12 +47,26 @@ func main() {
 
     fmt.Println("Successfully connected to the database!")
 
+    rabbitMQURL := os.Getenv("RABBITMQ_URL")
+	if rabbitMQURL == "" {
+		log.Fatal("RABBITMQ_URL environment variable is not set")
+	}
+
+    time.Sleep(10 * time.Second)
+
+	publisher, err := NewRabbitMQPublisher(rabbitMQURL)
+	if err != nil {
+		log.Fatalf("Failed to initialize RabbitMQ publisher: %v", err)
+	}
+	defer publisher.Close()
+    log.Println("successfully connected to rabbitmq!")
+
     // create http handlers and start the server
-    h := NewHandler(store)
+    h := NewHandler(store, publisher)
 
     mux := chi.NewRouter()
     RegisterRouters(mux,h)
 
     fmt.Println("Starting server on :8081")
-    http.ListenAndServe(":8081", mux)
+    http.ListenAndServe("0.0.0.0:8081", mux)
 }
